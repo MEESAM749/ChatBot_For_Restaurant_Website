@@ -1,17 +1,13 @@
 """
-Step 5: FastAPI Backend — The actual chatbot server.
-Using Groq (FREE API, hosts Llama 3) for LLM generation.
+Step 5: FastAPI Backend — Using ChromaDB's built-in embeddings.
+No sentence-transformers, no PyTorch. Lightweight and deploy-friendly.
 
 REQUIREMENTS:
-    pip install fastapi uvicorn chromadb sentence-transformers groq
+    pip install fastapi uvicorn chromadb groq
 
 TO RUN:
-    First set your API key:
-        Windows PowerShell:  $env:GROQ_API_KEY = "gsk_..."
-        Linux/Mac:           export GROQ_API_KEY="gsk_..."
-    
-    Then start the server:
-        uvicorn chatbot_server:app --reload --port 8000
+    $env:GROQ_API_KEY = "gsk_..."
+    uvicorn chatbot_server:app --reload --port 8000
 """
 
 import os
@@ -19,7 +15,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import chromadb
-from sentence_transformers import SentenceTransformer
 from groq import Groq
 
 
@@ -29,13 +24,7 @@ from groq import Groq
 
 CHROMA_DB_PATH = "./chroma_db"
 COLLECTION_NAME = "karachi_bites"
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 TOP_K = 3
-
-# Groq hosts these models for free:
-# - llama-3.3-70b-versatile  (best quality, still very fast)
-# - llama-3.1-8b-instant     (fastest, slightly lower quality)
-# - mixtral-8x7b-32768       (good alternative)
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
 
@@ -75,9 +64,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-print("Loading embedding model...")
-embedding_model = SentenceTransformer(EMBEDDING_MODEL)
-
 print("Connecting to ChromaDB...")
 chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
 collection = chroma_client.get_collection(name=COLLECTION_NAME)
@@ -95,6 +81,7 @@ if not groq_api_key:
 groq_client = Groq(api_key=groq_api_key)
 
 print(f"Using model: {GROQ_MODEL}")
+print(f"Chunks in DB: {collection.count()}")
 print("Server ready!\n")
 
 
@@ -117,11 +104,15 @@ class ChatResponse(BaseModel):
 # ============================================================
 
 def retrieve_context(query: str, top_k: int = TOP_K) -> list[dict]:
-    """Find relevant chunks from vector DB."""
-    query_embedding = embedding_model.encode([query])[0].tolist()
-    
+    """
+    Find relevant chunks. ChromaDB handles embedding the query
+    automatically using the same model it used to embed the documents.
+    No need to manually call an embedding model.
+    """
+    # When you pass query_texts (instead of query_embeddings),
+    # ChromaDB embeds the query for you using its default model.
     results = collection.query(
-        query_embeddings=[query_embedding],
+        query_texts=[query],
         n_results=top_k,
         include=["documents", "metadatas", "distances"]
     )
@@ -140,7 +131,6 @@ def retrieve_context(query: str, top_k: int = TOP_K) -> list[dict]:
 
 
 def build_prompt(user_message: str, context_chunks: list[dict]) -> str:
-    """Build the prompt with retrieved context."""
     context_text = ""
     for chunk in context_chunks:
         context_text += f"\n--- Source: {chunk['source']} | Section: {chunk['section']} ---\n"
@@ -157,14 +147,6 @@ Answer the customer's question based on the context above."""
 
 
 def call_llm(system_prompt: str, user_prompt: str) -> str:
-    """
-    Call Groq's API to generate the answer.
-    
-    Groq uses the OpenAI-compatible API format, so this looks
-    almost identical to an OpenAI call. In fact, if you ever
-    switch to OpenAI, you literally just change the client
-    initialization and model name — the rest is the same.
-    """
     response = groq_client.chat.completions.create(
         model=GROQ_MODEL,
         messages=[
@@ -174,7 +156,6 @@ def call_llm(system_prompt: str, user_prompt: str) -> str:
         max_tokens=500,
         temperature=0.3,
     )
-    
     return response.choices[0].message.content
 
 
@@ -184,7 +165,6 @@ def call_llm(system_prompt: str, user_prompt: str) -> str:
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Main chat endpoint."""
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
     
@@ -193,12 +173,8 @@ async def chat(request: ChatRequest):
     answer = call_llm(SYSTEM_PROMPT, user_prompt)
     
     sources = [
-        {
-            "source": chunk["source"],
-            "section": chunk["section"],
-            "chunk_id": chunk["chunk_id"],
-        }
-        for chunk in context_chunks
+        {"source": c["source"], "section": c["section"], "chunk_id": c["chunk_id"]}
+        for c in context_chunks
     ]
     
     return ChatResponse(answer=answer, sources=sources)
