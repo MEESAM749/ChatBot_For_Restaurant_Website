@@ -1,13 +1,12 @@
 """
-Step 5: FastAPI Backend — Using ChromaDB's built-in embeddings.
-No sentence-transformers, no PyTorch. Lightweight and deploy-friendly.
+Chatbot server — auto-builds vector DB on first startup.
 
 REQUIREMENTS:
     pip install fastapi uvicorn chromadb groq
 
 TO RUN:
     $env:GROQ_API_KEY = "gsk_..."
-    uvicorn chatbot_server:app --reload --port 8000
+    uvicorn chatbot_server:app --host 0.0.0.0 --port 8000
 """
 
 import os
@@ -24,13 +23,9 @@ from groq import Groq
 
 CHROMA_DB_PATH = "./chroma_db"
 COLLECTION_NAME = "karachi_bites"
+KB_FOLDER = "knowledge_base"
 TOP_K = 3
 GROQ_MODEL = "llama-3.3-70b-versatile"
-
-
-# ============================================================
-# SYSTEM PROMPT
-# ============================================================
 
 SYSTEM_PROMPT = """You are the friendly customer support assistant for Karachi Bites, 
 a Pakistani restaurant in F-7 Markaz, Islamabad.
@@ -51,6 +46,87 @@ RULES:
 
 
 # ============================================================
+# AUTO-BUILD: Chunk and embed documents if DB doesn't exist
+# ============================================================
+
+def build_database():
+    """Build the vector DB from knowledge_base/ folder."""
+    print("Building vector database from knowledge_base/...")
+    
+    chunks = []
+    for filename in sorted(os.listdir(KB_FOLDER)):
+        if not filename.endswith(".txt"):
+            continue
+        filepath = os.path.join(KB_FOLDER, filename)
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        lines = content.split("\n")
+        current_section = "General"
+        current_lines = []
+        doc_title = ""
+        
+        if "faq" in filename.lower():
+            current_qa = []
+            for line in lines:
+                stripped = line.strip()
+                if not doc_title and stripped and not stripped.startswith("Q:") and not stripped.startswith("==="):
+                    doc_title = stripped
+                    continue
+                if stripped.startswith("==="):
+                    continue
+                if stripped.startswith("Q:") and current_qa:
+                    qa_text = "\n".join(current_qa).strip()
+                    if qa_text:
+                        chunks.append({"text": qa_text, "source": filename, "section": "FAQ", "doc_title": doc_title})
+                    current_qa = [line]
+                else:
+                    current_qa.append(line)
+            qa_text = "\n".join(current_qa).strip()
+            if qa_text:
+                chunks.append({"text": qa_text, "source": filename, "section": "FAQ", "doc_title": doc_title})
+        else:
+            for line in lines:
+                stripped = line.strip()
+                if not doc_title and stripped and not stripped.startswith("==="):
+                    doc_title = stripped
+                    continue
+                if stripped.startswith("===") and stripped.endswith("==="):
+                    section_text = "\n".join(current_lines).strip()
+                    if section_text and len(section_text) > 20:
+                        chunks.append({"text": section_text, "source": filename, "section": current_section, "doc_title": doc_title})
+                    current_section = stripped.replace("=", "").strip()
+                    current_lines = []
+                else:
+                    current_lines.append(line)
+            section_text = "\n".join(current_lines).strip()
+            if section_text and len(section_text) > 20:
+                chunks.append({"text": section_text, "source": filename, "section": current_section, "doc_title": doc_title})
+    
+    for i, chunk in enumerate(chunks):
+        source = chunk["source"].replace(".txt", "")
+        chunk["chunk_id"] = f"{source}_{i:03d}"
+    
+    print(f"Created {len(chunks)} chunks")
+    
+    client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+    try:
+        client.delete_collection(COLLECTION_NAME)
+    except:
+        pass
+    
+    collection = client.create_collection(name=COLLECTION_NAME)
+    collection.add(
+        ids=[c["chunk_id"] for c in chunks],
+        documents=[c["text"] for c in chunks],
+        metadatas=[{"source": c["source"], "section": c["section"], "doc_title": c["doc_title"]} for c in chunks],
+    )
+    
+    print(f"Database built! {len(chunks)} chunks stored.")
+    return client, collection
+
+
+# ============================================================
 # STARTUP
 # ============================================================
 
@@ -64,35 +140,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Connect to ChromaDB — build it if it doesn't exist
 print("Connecting to ChromaDB...")
 chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-collection = chroma_client.get_collection(name=COLLECTION_NAME)
 
+try:
+    collection = chroma_client.get_collection(name=COLLECTION_NAME)
+    print(f"Found existing DB with {collection.count()} chunks")
+except Exception:
+    print("No existing DB found — building from scratch...")
+    chroma_client, collection = build_database()
+
+# Groq client
 print("Initializing Groq client...")
 groq_api_key = os.environ.get("GROQ_API_KEY")
 if not groq_api_key:
-    raise RuntimeError(
-        "GROQ_API_KEY not set!\n"
-        "Get your free key at: https://console.groq.com/keys\n"
-        "Then set it:\n"
-        "  PowerShell: $env:GROQ_API_KEY = 'gsk_...'\n"
-        "  Linux/Mac:  export GROQ_API_KEY='gsk_...'"
-    )
+    raise RuntimeError("GROQ_API_KEY not set!")
 groq_client = Groq(api_key=groq_api_key)
 
-print(f"Using model: {GROQ_MODEL}")
-print(f"Chunks in DB: {collection.count()}")
+print(f"Model: {GROQ_MODEL}")
+print(f"Chunks: {collection.count()}")
 print("Server ready!\n")
 
 
 # ============================================================
-# REQUEST / RESPONSE MODELS
+# MODELS
 # ============================================================
 
 class ChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
-
 
 class ChatResponse(BaseModel):
     answer: str
@@ -104,19 +181,11 @@ class ChatResponse(BaseModel):
 # ============================================================
 
 def retrieve_context(query: str, top_k: int = TOP_K) -> list[dict]:
-    """
-    Find relevant chunks. ChromaDB handles embedding the query
-    automatically using the same model it used to embed the documents.
-    No need to manually call an embedding model.
-    """
-    # When you pass query_texts (instead of query_embeddings),
-    # ChromaDB embeds the query for you using its default model.
     results = collection.query(
         query_texts=[query],
         n_results=top_k,
         include=["documents", "metadatas", "distances"]
     )
-    
     chunks = []
     for i in range(len(results["ids"][0])):
         chunks.append({
@@ -126,7 +195,6 @@ def retrieve_context(query: str, top_k: int = TOP_K) -> list[dict]:
             "section": results["metadatas"][0][i]["section"],
             "distance": results["distances"][0][i],
         })
-    
     return chunks
 
 
@@ -136,7 +204,6 @@ def build_prompt(user_message: str, context_chunks: list[dict]) -> str:
         context_text += f"\n--- Source: {chunk['source']} | Section: {chunk['section']} ---\n"
         context_text += chunk["text"]
         context_text += "\n"
-    
     return f"""Here is the relevant information from our knowledge base:
 
 {context_text}
@@ -160,7 +227,7 @@ def call_llm(system_prompt: str, user_prompt: str) -> str:
 
 
 # ============================================================
-# API ENDPOINTS
+# ENDPOINTS
 # ============================================================
 
 @app.post("/chat", response_model=ChatResponse)
@@ -176,7 +243,6 @@ async def chat(request: ChatRequest):
         {"source": c["source"], "section": c["section"], "chunk_id": c["chunk_id"]}
         for c in context_chunks
     ]
-    
     return ChatResponse(answer=answer, sources=sources)
 
 
