@@ -12,6 +12,7 @@ TO RUN:
 import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import chromadb
 from groq import Groq
@@ -254,6 +255,14 @@ async def health():
         "chunks_in_db": collection.count(),
         "llm": GROQ_MODEL,
     }
+
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    """Serve the chat widget demo page at the root URL."""
+    html_path = os.path.join(os.path.dirname(__file__), "chat_widget.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return f.read()
 
 
 if __name__ == "__main__":
