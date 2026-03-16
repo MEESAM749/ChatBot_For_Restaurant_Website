@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karachi Bites — Chat Widget Demo</title>
+    <style>
+        /* ============================================================
+           THIS FILE HAS TWO PARTS:
+           1. The demo page (just to show the widget in context)
+           2. The chat widget itself (the part you'd embed on any site)
+           
+           For a real client, you ONLY give them the widget CSS + JS.
+           The demo page is just for testing/portfolio.
+        ============================================================ */
+
+        /* --- DEMO PAGE STYLES (not part of the widget) --- */
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Playfair+Display:wght@700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: #faf8f5;
+            color: #2a2a2a;
+            min-height: 100vh;
+        }
+
+        .demo-page {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 24px 120px;
+        }
+
+        .demo-page h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 3rem;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .demo-page .tagline {
+            font-size: 1.1rem;
+            color: #888;
+            margin-bottom: 48px;
+        }
+
+        .demo-section {
+            background: #fff;
+            border: 1px solid #e8e4df;
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 32px;
+        }
+
+        .demo-section h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+            color: #1a1a1a;
+        }
+
+        .demo-section p {
+            color: #666;
+            line-height: 1.7;
+            margin-bottom: 12px;
+        }
+
+        .demo-menu-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .demo-menu-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #faf8f5;
+            border-radius: 10px;
+            font-size: 0.95rem;
+        }
+
+        .demo-menu-item .price {
+            font-weight: 700;
+            color: #c85a2a;
+        }
+
+        .demo-hint {
+            position: fixed;
+            bottom: 100px;
+            right: 100px;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            animation: hintPulse 2s ease-in-out infinite, hintFadeOut 6s ease forwards;
+            pointer-events: none;
+            z-index: 9998;
+        }
+
+        .demo-hint::after {
+            content: '';
+            position: absolute;
+            right: -6px;
+            bottom: 12px;
+            width: 12px;
+            height: 12px;
+            background: #1a1a1a;
+            transform: rotate(45deg);
+        }
+
+        @keyframes hintPulse {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+
+        @keyframes hintFadeOut {
+            0%, 70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+
+        /* ============================================================
+           CHAT WIDGET STYLES — This is what you embed on client sites
+        ============================================================ */
+
+        :root {
+            --kb-primary: #c85a2a;
+            --kb-primary-dark: #a84820;
+            --kb-primary-light: #f7efe9;
+            --kb-bg: #ffffff;
+            --kb-bg-subtle: #faf8f5;
+            --kb-text: #1a1a1a;
+            --kb-text-muted: #888888;
+            --kb-border: #e8e4df;
+            --kb-shadow: 0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+            --kb-radius: 20px;
+        }
+
+        /* --- Floating Button --- */
+        .kb-chat-button {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--kb-primary);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 24px rgba(200, 90, 42, 0.4);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 10000;
+        }
+
+        .kb-chat-button:hover {
+            transform: scale(1.08);
+            box-shadow: 0 8px 32px rgba(200, 90, 42, 0.5);
+        }
+
+        .kb-chat-button svg {
+            width: 28px;
+            height: 28px;
+            fill: #fff;
+            transition: transform 0.3s ease;
+        }
+
+        .kb-chat-button.kb-open svg.kb-icon-chat { display: none; }
+        .kb-chat-button.kb-open svg.kb-icon-close { display: block; }
+        .kb-chat-button:not(.kb-open) svg.kb-icon-chat { display: block; }
+        .kb-chat-button:not(.kb-open) svg.kb-icon-close { display: none; }
+
+        /* --- Chat Window --- */
+        .kb-chat-window {
+            position: fixed;
+            bottom: 104px;
+            right: 28px;
+            width: 400px;
+            height: 560px;
+            background: var(--kb-bg);
+            border-radius: var(--kb-radius);
+            box-shadow: var(--kb-shadow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(16px) scale(0.96);
+            pointer-events: none;
+            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border: 1px solid var(--kb-border);
+        }
+
+        .kb-chat-window.kb-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: all;
+        }
+
+        /* --- Header --- */
+        .kb-chat-header {
+            background: var(--kb-primary);
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-shrink: 0;
+        }
+
+        .kb-chat-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+
+        .kb-chat-header-text h3 {
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 700;
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        .kb-chat-header-text p {
+            color: rgba(255,255,255,0.75);
+            font-size: 0.8rem;
+            margin-top: 2px;
+        }
+
+        .kb-status-dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            background: #4ade80;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: kb-pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes kb-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* --- Messages Area --- */
+        .kb-chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            background: var(--kb-bg-subtle);
+        }
+
+        .kb-chat-messages::-webkit-scrollbar {
+            width: 5px;
+        }
+        .kb-chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .kb-chat-messages::-webkit-scrollbar-thumb {
+            background: #d4d0cb;
+            border-radius: 10px;
+        }
+
+        /* --- Message Bubbles --- */
+        .kb-msg {
+            max-width: 82%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 0.9rem;
+            line-height: 1.55;
+            animation: kb-fadeIn 0.3s ease;
+        }
+
+        @keyframes kb-fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .kb-msg-bot {
+            align-self: flex-start;
+            background: var(--kb-bg);
+            color: var(--kb-text);
+            border: 1px solid var(--kb-border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .kb-msg-user {
+            align-self: flex-end;
+            background: var(--kb-primary);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+
+        /* --- Typing Indicator --- */
+        .kb-typing {
+            align-self: flex-start;
+            display: flex;
+            gap: 5px;
+            padding: 14px 18px;
+            background: var(--kb-bg);
+            border: 1px solid var(--kb-border);
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+        }
+
+        .kb-typing-dot {
+            width: 7px;
+            height: 7px;
+            background: #bbb;
+            border-radius: 50%;
+            animation: kb-bounce 1.4s ease-in-out infinite;
+        }
+
+        .kb-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+        .kb-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes kb-bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-6px); }
+        }
+
+        /* --- Input Area --- */
+        .kb-chat-input-area {
+            padding: 16px 20px;
+            border-top: 1px solid var(--kb-border);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: var(--kb-bg);
+            flex-shrink: 0;
+        }
+
+        .kb-chat-input {
+            flex: 1;
+            border: 1px solid var(--kb-border);
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 0.9rem;
+            font-family: 'DM Sans', sans-serif;
+            outline: none;
+            transition: border-color 0.2s ease;
+            background: var(--kb-bg-subtle);
+            color: var(--kb-text);
+        }
+
+        .kb-chat-input:focus {
+            border-color: var(--kb-primary);
+        }
+
+        .kb-chat-input::placeholder {
+            color: var(--kb-text-muted);
+        }
+
+        .kb-send-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: var(--kb-primary);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .kb-send-btn:hover {
+            background: var(--kb-primary-dark);
+        }
+
+        .kb-send-btn:disabled {
+            background: #ddd;
+            cursor: not-allowed;
+        }
+
+        .kb-send-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: #fff;
+        }
+
+        /* --- Powered By --- */
+        .kb-powered {
+            text-align: center;
+            padding: 8px;
+            font-size: 0.7rem;
+            color: var(--kb-text-muted);
+            background: var(--kb-bg);
+        }
+
+        /* --- Mobile Responsive --- */
+        @media (max-width: 480px) {
+            .kb-chat-window {
+                width: calc(100vw - 16px);
+                height: calc(100vh - 80px);
+                bottom: 8px;
+                right: 8px;
+                border-radius: 16px;
+            }
+
+            .kb-chat-button {
+                bottom: 16px;
+                right: 16px;
+            }
+
+            .demo-hint { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============================================================
+         DEMO PAGE — Simulates a restaurant website
+    ============================================================ -->
+    <div class="demo-page">
+        <h1>Karachi Bites</h1>
+        <p class="tagline">Authentic Karachi street food in the heart of Islamabad</p>
+
+        <div class="demo-section">
+            <h2>Welcome</h2>
+            <p>
+                Founded in 2018 by Chef Hamza Ali, Karachi Bites brings the authentic taste 
+                of Karachi's street food culture to Islamabad. Everything is made fresh daily — 
+                no shortcuts, no frozen ingredients.
+            </p>
+            <p>
+                Visit us at Shop #12, F-7 Markaz, Jinnah Super, Islamabad.
+                Open daily from 12:00 PM.
+            </p>
+        </div>
+
+        <div class="demo-section">
+            <h2>Popular Items</h2>
+            <div class="demo-menu-grid">
+                <div class="demo-menu-item">
+                    <span>Chicken Karahi (half)</span>
+                    <span class="price">Rs. 900</span>
+                </div>
+                <div class="demo-menu-item">
+                    <span>Chicken Biryani (full)</span>
+                    <span class="price">Rs. 700</span>
+                </div>
+                <div class="demo-menu-item">
+                    <span>Malai Boti (8 pcs)</span>
+                    <span class="price">Rs. 550</span>
+                </div>
+                <div class="demo-menu-item">
+                    <span>Seekh Kabab (4 pcs)</span>
+                    <span class="price">Rs. 400</span>
+                </div>
+                <div class="demo-menu-item">
+                    <span>Mixed Grill Platter</span>
+                    <span class="price">Rs. 1500</span>
+                </div>
+                <div class="demo-menu-item">
+                    <span>Doodh Patti Chai</span>
+                    <span class="price">Rs. 100</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h2>Hours & Contact</h2>
+            <p>Mon–Thu: 12 PM — Midnight &nbsp;|&nbsp; Fri–Sun: 12 PM — 1 AM</p>
+            <p>Phone: 051-2345678 &nbsp;|&nbsp; WhatsApp: 0311-5551234</p>
+        </div>
+    </div>
+
+    <!-- Hint arrow pointing to chat button -->
+    <div class="demo-hint">Try the chatbot! →</div>
+
+
+    <!-- ============================================================
+         CHAT WIDGET — This is the embeddable part
+    ============================================================ -->
+
+    <!-- Floating Chat Button -->
+    <button class="kb-chat-button" id="kbChatBtn" onclick="toggleChat()">
+        <svg class="kb-icon-chat" viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/>
+            <path d="M7 9h10v2H7zm0-3h10v2H7zm0 6h7v2H7z"/>
+        </svg>
+        <svg class="kb-icon-close" viewBox="0 0 24 24">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+    </button>
+
+    <!-- Chat Window -->
+    <div class="kb-chat-window" id="kbChatWindow">
+        <!-- Header -->
+        <div class="kb-chat-header">
+            <div class="kb-chat-avatar">🍛</div>
+            <div class="kb-chat-header-text">
+                <h3>Karachi Bites</h3>
+                <p><span class="kb-status-dot"></span>Usually replies instantly</p>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="kb-chat-messages" id="kbMessages">
+            <div class="kb-msg kb-msg-bot">
+                Assalam-o-Alaikum! 👋 Welcome to Karachi Bites. Ask me anything about our menu, delivery, reservations, or anything else!
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="kb-chat-input-area">
+            <input 
+                type="text" 
+                class="kb-chat-input" 
+                id="kbInput" 
+                placeholder="Ask about menu, delivery, hours..."
+                onkeydown="if(event.key==='Enter') sendMessage()"
+            >
+            <button class="kb-send-btn" id="kbSendBtn" onclick="sendMessage()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="kb-powered">Powered by AI Assistant</div>
+    </div>
+
+
+    <!-- ============================================================
+         CHAT WIDGET JAVASCRIPT
+         
+         CONFIG: Change ONLY the API_URL to point to your FastAPI server.
+         Everything else works out of the box.
+    ============================================================ -->
+    <script>
+        // ========== CONFIG ==========
+        // Change this to your deployed server URL in production
+        // e.g., "https://api.karachibites.pk" or "https://your-app.railway.app"
+        const API_URL = "http://localhost:8000";
+        // =============================
+
+        let chatOpen = false;
+        let isWaiting = false;
+
+        function toggleChat() {
+            chatOpen = !chatOpen;
+            const btn = document.getElementById('kbChatBtn');
+            const win = document.getElementById('kbChatWindow');
+            
+            btn.classList.toggle('kb-open', chatOpen);
+            win.classList.toggle('kb-visible', chatOpen);
+
+            if (chatOpen) {
+                document.getElementById('kbInput').focus();
+            }
+        }
+
+        function addMessage(text, sender) {
+            const messages = document.getElementById('kbMessages');
+            const msg = document.createElement('div');
+            msg.className = `kb-msg kb-msg-${sender}`;
+            msg.textContent = text;
+            messages.appendChild(msg);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function showTyping() {
+            const messages = document.getElementById('kbMessages');
+            const typing = document.createElement('div');
+            typing.className = 'kb-typing';
+            typing.id = 'kbTyping';
+            typing.innerHTML = `
+                <div class="kb-typing-dot"></div>
+                <div class="kb-typing-dot"></div>
+                <div class="kb-typing-dot"></div>
+            `;
+            messages.appendChild(typing);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function hideTyping() {
+            const typing = document.getElementById('kbTyping');
+            if (typing) typing.remove();
+        }
+
+        async function sendMessage() {
+            if (isWaiting) return;
+
+            const input = document.getElementById('kbInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Show user message
+            addMessage(message, 'user');
+            input.value = '';
+
+            // Show typing indicator
+            isWaiting = true;
+            document.getElementById('kbSendBtn').disabled = true;
+            showTyping();
+
+            try {
+                const response = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+
+                if (!response.ok) throw new Error('Server error');
+
+                const data = await response.json();
+                hideTyping();
+                addMessage(data.answer, 'bot');
+
+            } catch (error) {
+                hideTyping();
+                addMessage(
+                    "Sorry, I'm having trouble connecting right now. Please try again or contact us on WhatsApp at 0311-5551234.",
+                    'bot'
+                );
+                console.error('Chat error:', error);
+            }
+
+            isWaiting = false;
+            document.getElementById('kbSendBtn').disabled = false;
+            document.getElementById('kbInput').focus();
+        }
+    </script>
+
+</body>
+</html>
