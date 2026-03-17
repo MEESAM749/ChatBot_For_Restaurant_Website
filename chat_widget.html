@@ -395,6 +395,184 @@
             fill: #fff;
         }
 
+        /* --- Cart Badge (in header) --- */
+        .kb-cart-btn {
+            margin-left: auto;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 10px;
+            padding: 8px 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #fff;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            transition: background 0.2s ease;
+            position: relative;
+        }
+        .kb-cart-btn:hover { background: rgba(255,255,255,0.3); }
+        .kb-cart-btn svg { width: 20px; height: 20px; fill: #fff; }
+        .kb-cart-badge {
+            background: #fff;
+            color: var(--kb-primary);
+            font-size: 0.7rem;
+            font-weight: 700;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: -4px;
+            right: -4px;
+        }
+        .kb-cart-badge:empty, .kb-cart-badge[data-count="0"] { display: none; }
+
+        /* --- Cart Panel (overlay inside chat window) --- */
+        .kb-cart-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--kb-bg);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .kb-cart-panel.kb-panel-visible { transform: translateX(0); }
+
+        .kb-cart-header {
+            background: var(--kb-primary);
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .kb-cart-header h3 { color: #fff; font-size: 1.05rem; font-weight: 700; font-family: 'DM Sans', sans-serif; }
+        .kb-cart-back {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 8px;
+            padding: 6px 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .kb-cart-back svg { width: 20px; height: 20px; fill: #fff; }
+        .kb-cart-back:hover { background: rgba(255,255,255,0.3); }
+
+        .kb-cart-items {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+        }
+        .kb-cart-empty {
+            text-align: center;
+            color: var(--kb-text-muted);
+            padding: 40px 20px;
+            font-size: 0.9rem;
+        }
+        .kb-cart-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--kb-border);
+        }
+        .kb-cart-item-info { flex: 1; }
+        .kb-cart-item-name { font-size: 0.88rem; font-weight: 600; color: var(--kb-text); }
+        .kb-cart-item-meta { font-size: 0.78rem; color: var(--kb-text-muted); margin-top: 2px; }
+        .kb-cart-item-price { font-weight: 700; color: var(--kb-primary); font-size: 0.9rem; white-space: nowrap; }
+        .kb-cart-remove-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #d44;
+            font-size: 1.1rem;
+            padding: 4px;
+            line-height: 1;
+        }
+        .kb-cart-remove-btn:hover { color: #a00; }
+
+        .kb-cart-footer {
+            border-top: 1px solid var(--kb-border);
+            padding: 16px 20px;
+            flex-shrink: 0;
+        }
+        .kb-cart-total {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--kb-text);
+            margin-bottom: 12px;
+        }
+        .kb-checkout-btn {
+            width: 100%;
+            padding: 14px;
+            background: #25D366;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background 0.2s ease;
+        }
+        .kb-checkout-btn:hover { background: #1da851; }
+        .kb-checkout-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .kb-checkout-btn svg { width: 20px; height: 20px; fill: #fff; }
+
+        /* --- Checkout Form --- */
+        .kb-checkout-form { padding: 16px 20px; flex: 1; overflow-y: auto; }
+        .kb-checkout-form h4 { font-size: 0.95rem; margin-bottom: 14px; color: var(--kb-text); }
+        .kb-checkout-field {
+            width: 100%;
+            border: 1px solid var(--kb-border);
+            border-radius: 10px;
+            padding: 11px 14px;
+            font-size: 0.88rem;
+            font-family: 'DM Sans', sans-serif;
+            margin-bottom: 10px;
+            outline: none;
+            background: var(--kb-bg-subtle);
+            color: var(--kb-text);
+        }
+        .kb-checkout-field:focus { border-color: var(--kb-primary); }
+
+        /* --- Add to Cart buttons in bot messages --- */
+        .kb-add-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--kb-primary-light);
+            color: var(--kb-primary);
+            border: 1px solid var(--kb-primary);
+            border-radius: 8px;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer;
+            margin-top: 4px;
+            margin-right: 4px;
+            transition: all 0.15s ease;
+        }
+        .kb-add-btn:hover { background: var(--kb-primary); color: #fff; }
+
         /* --- Powered By --- */
         .kb-powered {
             text-align: center;
@@ -510,6 +688,44 @@
                 <h3>Karachi Bites</h3>
                 <p><span class="kb-status-dot"></span>Usually replies instantly</p>
             </div>
+            <button class="kb-cart-btn" id="kbCartBtn" onclick="toggleCartPanel()">
+                <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM7.16 6.26l.54 2h12.07l-1.1 4H8.53L7.16 6.26zM5.16 4l.87 2H21a1 1 0 0 1 .97 1.24l-1.5 5.5A1 1 0 0 1 19.5 14H8.1l-.9-2H3V10h2.85L4.28 4H2V2h3.84L5.16 4z"/></svg>
+                <span class="kb-cart-badge" id="kbCartBadge"></span>
+            </button>
+        </div>
+
+        <!-- Cart Panel (slides in over the chat) -->
+        <div class="kb-cart-panel" id="kbCartPanel">
+            <div class="kb-cart-header">
+                <button class="kb-cart-back" onclick="toggleCartPanel()">
+                    <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                </button>
+                <h3 id="kbCartTitle">Your Cart</h3>
+            </div>
+            <div class="kb-cart-items" id="kbCartItems">
+                <div class="kb-cart-empty">Your cart is empty. Ask about our menu to get started!</div>
+            </div>
+            <div class="kb-cart-footer" id="kbCartFooter" style="display:none;">
+                <div class="kb-cart-total">
+                    <span>Total</span>
+                    <span id="kbCartTotal">Rs. 0</span>
+                </div>
+                <button class="kb-checkout-btn" id="kbCheckoutBtn" onclick="showCheckoutForm()">
+                    <svg viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                    Checkout via WhatsApp
+                </button>
+            </div>
+            <!-- Checkout form (hidden by default) -->
+            <div class="kb-checkout-form" id="kbCheckoutForm" style="display:none;">
+                <h4>Delivery Details</h4>
+                <input class="kb-checkout-field" id="kbCustName" placeholder="Your name" />
+                <input class="kb-checkout-field" id="kbCustPhone" placeholder="Phone number (e.g. 0300-1234567)" />
+                <input class="kb-checkout-field" id="kbCustAddress" placeholder="Delivery address" />
+                <button class="kb-checkout-btn" onclick="submitCheckout()" id="kbSubmitCheckout">
+                    <svg viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                    Send Order on WhatsApp
+                </button>
+            </div>
         </div>
 
         <!-- Messages -->
@@ -547,35 +763,56 @@
     ============================================================ -->
     <script>
         // ========== CONFIG ==========
-        // Change this to your deployed server URL in production
-        // e.g., "https://api.karachibites.pk" or "https://your-app.railway.app"
         const API_URL = window.location.origin;
         // =============================
 
         let chatOpen = false;
         let isWaiting = false;
         let conversationId = null;
+        let cart = [];
+        let cartTotal = 0;
 
+        // ========== CHAT TOGGLE ==========
         function toggleChat() {
             chatOpen = !chatOpen;
             const btn = document.getElementById('kbChatBtn');
             const win = document.getElementById('kbChatWindow');
-            
             btn.classList.toggle('kb-open', chatOpen);
             win.classList.toggle('kb-visible', chatOpen);
-
-            if (chatOpen) {
-                document.getElementById('kbInput').focus();
-            }
+            if (chatOpen) document.getElementById('kbInput').focus();
         }
 
+        // ========== MESSAGES ==========
         function addMessage(text, sender) {
             const messages = document.getElementById('kbMessages');
             const msg = document.createElement('div');
             msg.className = `kb-msg kb-msg-${sender}`;
-            msg.textContent = text;
+
+            if (sender === 'bot') {
+                msg.innerHTML = renderBotMessage(text);
+            } else {
+                msg.textContent = text;
+            }
+
             messages.appendChild(msg);
             messages.scrollTop = messages.scrollHeight;
+        }
+
+        function renderBotMessage(text) {
+            // Split text into lines. For lines matching "Item — Rs. Price", add an "Add" button.
+            const lines = text.split('\n');
+            let html = '';
+            for (const line of lines) {
+                const match = line.match(/^(.+?)\s*[—\-–]\s*Rs\.?\s*([\d,]+)/);
+                if (match) {
+                    const itemName = match[1].trim();
+                    const escapedName = itemName.replace(/'/g, "\\'");
+                    html += `<div>${line} <button class="kb-add-btn" onclick="addToCart('${escapedName}')">+ Add</button></div>`;
+                } else {
+                    html += `<div>${line}</div>`;
+                }
+            }
+            return html;
         }
 
         function showTyping() {
@@ -597,18 +834,15 @@
             if (typing) typing.remove();
         }
 
+        // ========== SEND MESSAGE ==========
         async function sendMessage() {
             if (isWaiting) return;
-
             const input = document.getElementById('kbInput');
             const message = input.value.trim();
             if (!message) return;
 
-            // Show user message
             addMessage(message, 'user');
             input.value = '';
-
-            // Show typing indicator
             isWaiting = true;
             document.getElementById('kbSendBtn').disabled = true;
             showTyping();
@@ -619,14 +853,11 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: message, conversation_id: conversationId })
                 });
-
                 if (!response.ok) throw new Error('Server error');
-
                 const data = await response.json();
                 conversationId = data.conversation_id;
                 hideTyping();
                 addMessage(data.answer, 'bot');
-
             } catch (error) {
                 hideTyping();
                 addMessage(
@@ -639,6 +870,129 @@
             isWaiting = false;
             document.getElementById('kbSendBtn').disabled = false;
             document.getElementById('kbInput').focus();
+        }
+
+        // ========== CART ==========
+        function updateCartUI() {
+            const badge = document.getElementById('kbCartBadge');
+            const itemCount = cart.reduce((sum, e) => sum + e.qty, 0);
+            badge.textContent = itemCount || '';
+            badge.setAttribute('data-count', itemCount);
+
+            const itemsDiv = document.getElementById('kbCartItems');
+            const footer = document.getElementById('kbCartFooter');
+
+            if (cart.length === 0) {
+                itemsDiv.innerHTML = '<div class="kb-cart-empty">Your cart is empty. Ask about our menu to get started!</div>';
+                footer.style.display = 'none';
+                return;
+            }
+
+            footer.style.display = 'block';
+            document.getElementById('kbCartTotal').textContent = `Rs. ${cartTotal.toLocaleString()}`;
+
+            let html = '';
+            for (const item of cart) {
+                const lineTotal = item.qty * item.unit_price;
+                const escapedName = item.name.replace(/'/g, "\\'");
+                html += `
+                    <div class="kb-cart-item">
+                        <div class="kb-cart-item-info">
+                            <div class="kb-cart-item-name">${item.name}</div>
+                            <div class="kb-cart-item-meta">${item.qty}x Rs. ${item.unit_price.toLocaleString()}</div>
+                        </div>
+                        <div class="kb-cart-item-price">Rs. ${lineTotal.toLocaleString()}</div>
+                        <button class="kb-cart-remove-btn" onclick="removeFromCart('${escapedName}')">&times;</button>
+                    </div>`;
+            }
+            itemsDiv.innerHTML = html;
+        }
+
+        async function addToCart(itemName) {
+            if (!conversationId) return;
+            try {
+                const res = await fetch(`${API_URL}/cart/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conversation_id: conversationId, item: itemName, quantity: 1 })
+                });
+                if (!res.ok) { console.error('Add to cart failed'); return; }
+                const data = await res.json();
+                cart = data.cart;
+                cartTotal = data.total;
+                updateCartUI();
+            } catch (err) { console.error('Cart error:', err); }
+        }
+
+        async function removeFromCart(itemName) {
+            if (!conversationId) return;
+            try {
+                const res = await fetch(`${API_URL}/cart/remove`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conversation_id: conversationId, item: itemName })
+                });
+                if (!res.ok) { console.error('Remove from cart failed'); return; }
+                const data = await res.json();
+                cart = data.cart;
+                cartTotal = data.total;
+                updateCartUI();
+            } catch (err) { console.error('Cart error:', err); }
+        }
+
+        // ========== CART PANEL ==========
+        function toggleCartPanel() {
+            const panel = document.getElementById('kbCartPanel');
+            panel.classList.toggle('kb-panel-visible');
+            // Reset to cart view when opening
+            document.getElementById('kbCartItems').style.display = '';
+            document.getElementById('kbCartFooter').style.display = cart.length ? 'block' : 'none';
+            document.getElementById('kbCheckoutForm').style.display = 'none';
+            document.getElementById('kbCartTitle').textContent = 'Your Cart';
+        }
+
+        // ========== CHECKOUT ==========
+        function showCheckoutForm() {
+            document.getElementById('kbCartItems').style.display = 'none';
+            document.getElementById('kbCartFooter').style.display = 'none';
+            document.getElementById('kbCheckoutForm').style.display = 'block';
+            document.getElementById('kbCartTitle').textContent = 'Checkout';
+        }
+
+        async function submitCheckout() {
+            const name = document.getElementById('kbCustName').value.trim();
+            const phone = document.getElementById('kbCustPhone').value.trim();
+            const address = document.getElementById('kbCustAddress').value.trim();
+
+            if (!name || !phone || !address) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/cart/checkout`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conversation_id: conversationId, name, phone, address })
+                });
+                if (!res.ok) throw new Error('Checkout failed');
+                const data = await res.json();
+
+                // Open WhatsApp in new tab
+                window.open(data.whatsapp_url, '_blank');
+
+                // Close cart panel, clear cart locally
+                toggleCartPanel();
+                cart = [];
+                cartTotal = 0;
+                updateCartUI();
+
+                // Show confirmation in chat
+                addMessage(`Order sent to WhatsApp! Our team will confirm your order shortly. Total: Rs. ${data.order_summary.split('Total: ')[1] || ''}`, 'bot');
+            } catch (err) {
+                console.error('Checkout error:', err);
+                alert('Something went wrong. Please try again.');
+            }
         }
     </script>
 

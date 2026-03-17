@@ -10,8 +10,10 @@ TO RUN:
 """
 
 import os
+import re
 import uuid
 import time
+from urllib.parse import quote
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -31,6 +33,35 @@ TOP_K = 3
 GROQ_MODEL = "llama-3.3-70b-versatile"
 MAX_HISTORY_TURNS = 10          # keep last 10 messages (5 user + 5 assistant)
 SESSION_TTL_SECONDS = 30 * 60   # 30 minutes
+WHATSAPP_NUMBER = "923115551234"
+
+
+# ============================================================
+# MENU PARSING
+# ============================================================
+
+def parse_menu(filepath: str) -> list[dict]:
+    """Parse menu.txt into a list of {name, price, category}."""
+    items = []
+    category = "General"
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("===") and line.endswith("==="):
+                category = line.replace("=", "").strip()
+                continue
+            match = re.match(r"^(.+?)\s*[—\-]\s*Rs\.\s*([\d,]+)", line)
+            if match:
+                name = match.group(1).strip()
+                price = int(match.group(2).replace(",", ""))
+                items.append({"name": name, "price": price, "category": category})
+    return items
+
+
+MENU_ITEMS = parse_menu(os.path.join(KB_FOLDER, "menu.txt"))
+# Build a lookup dict for fast matching (lowercase name → item)
+MENU_LOOKUP = {item["name"].lower(): item for item in MENU_ITEMS}
+print(f"Parsed {len(MENU_ITEMS)} menu items")
 
 SYSTEM_PROMPT = """You are the friendly customer support assistant for Karachi Bites, 
 a Pakistani restaurant in F-7 Markaz, Islamabad.
@@ -49,6 +80,10 @@ RULES:
   information into one coherent answer.
 - You may receive conversation history. Use it to understand follow-up
   questions and resolve references like "it", "that", "how much", etc.
+- Customers can order directly through this chat! When listing menu items,
+  always include the item name and price in the format "Item Name — Rs. Price"
+  so the ordering buttons appear. If a customer wants to order, let them know
+  they can use the cart button in the chat header and checkout via WhatsApp.
 """
 
 
@@ -184,7 +219,7 @@ def get_or_create_session(conversation_id: str | None) -> str:
         conversations[conversation_id]["last_active"] = time.time()
         return conversation_id
     new_id = str(uuid.uuid4())
-    conversations[new_id] = {"messages": [], "last_active": time.time()}
+    conversations[new_id] = {"messages": [], "cart": [], "last_active": time.time()}
     return new_id
 
 
@@ -209,6 +244,70 @@ class ChatResponse(BaseModel):
     answer: str
     sources: list[dict]
     conversation_id: str
+
+
+class CartAddRequest(BaseModel):
+    conversation_id: str
+    item: str
+    quantity: int = 1
+
+class CartRemoveRequest(BaseModel):
+    conversation_id: str
+    item: str
+
+class CartResponse(BaseModel):
+    cart: list[dict]
+    total: int
+    message: str
+
+class CheckoutRequest(BaseModel):
+    conversation_id: str
+    name: str
+    phone: str
+    address: str
+
+class CheckoutResponse(BaseModel):
+    whatsapp_url: str
+    order_summary: str
+
+
+# ============================================================
+# CART HELPERS
+# ============================================================
+
+def find_menu_item(query: str) -> dict | None:
+    """Find a menu item by case-insensitive exact or substring match."""
+    query_lower = query.lower().strip()
+    # Exact match first
+    if query_lower in MENU_LOOKUP:
+        return MENU_LOOKUP[query_lower]
+    # Substring match — return first item whose name contains the query
+    for name, item in MENU_LOOKUP.items():
+        if query_lower in name or name in query_lower:
+            return item
+    return None
+
+
+def cart_total(cart: list[dict]) -> int:
+    return sum(item["qty"] * item["unit_price"] for item in cart)
+
+
+def build_whatsapp_url(cart: list[dict], name: str, phone: str, address: str) -> str:
+    lines = ["🍛 *New Order — Karachi Bites*", ""]
+    lines.append(f"*Customer:* {name}")
+    lines.append(f"*Phone:* {phone}")
+    lines.append(f"*Address:* {address}")
+    lines.append("")
+    lines.append("*Order:*")
+    for item in cart:
+        line_total = item["qty"] * item["unit_price"]
+        lines.append(f"• {item['qty']}x {item['name']} — Rs. {line_total:,}")
+    lines.append("")
+    lines.append(f"*Total: Rs. {cart_total(cart):,}*")
+    lines.append("")
+    lines.append("Sent via Karachi Bites Chatbot")
+    message = "\n".join(lines)
+    return f"https://wa.me/{WHATSAPP_NUMBER}?text={quote(message)}"
 
 
 # ============================================================
@@ -293,6 +392,77 @@ async def chat(request: ChatRequest):
         for c in context_chunks
     ]
     return ChatResponse(answer=answer, sources=sources, conversation_id=session_id)
+
+
+# ============================================================
+# CART ENDPOINTS
+# ============================================================
+
+@app.post("/cart/add", response_model=CartResponse)
+async def cart_add(request: CartAddRequest):
+    if request.conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Session not found")
+    menu_item = find_menu_item(request.item)
+    if not menu_item:
+        raise HTTPException(status_code=404, detail=f"Menu item '{request.item}' not found")
+
+    cart = conversations[request.conversation_id]["cart"]
+    # If item already in cart, increment qty
+    for entry in cart:
+        if entry["name"].lower() == menu_item["name"].lower():
+            entry["qty"] += request.quantity
+            return CartResponse(
+                cart=cart, total=cart_total(cart),
+                message=f"Updated {menu_item['name']} to {entry['qty']}x"
+            )
+    # New item
+    cart.append({"name": menu_item["name"], "qty": request.quantity, "unit_price": menu_item["price"]})
+    return CartResponse(
+        cart=cart, total=cart_total(cart),
+        message=f"Added {request.quantity}x {menu_item['name']} (Rs. {menu_item['price']})"
+    )
+
+
+@app.post("/cart/remove", response_model=CartResponse)
+async def cart_remove(request: CartRemoveRequest):
+    if request.conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    cart = conversations[request.conversation_id]["cart"]
+    menu_item = find_menu_item(request.item)
+    item_name_lower = menu_item["name"].lower() if menu_item else request.item.lower()
+
+    original_len = len(cart)
+    conversations[request.conversation_id]["cart"] = [
+        e for e in cart if e["name"].lower() != item_name_lower
+    ]
+    cart = conversations[request.conversation_id]["cart"]
+
+    if len(cart) == original_len:
+        raise HTTPException(status_code=404, detail="Item not in cart")
+    return CartResponse(cart=cart, total=cart_total(cart), message=f"Removed {request.item}")
+
+
+@app.get("/cart/{conversation_id}", response_model=CartResponse)
+async def cart_get(conversation_id: str):
+    if conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Session not found")
+    cart = conversations[conversation_id]["cart"]
+    return CartResponse(cart=cart, total=cart_total(cart), message=f"{len(cart)} item(s) in cart")
+
+
+@app.post("/cart/checkout", response_model=CheckoutResponse)
+async def cart_checkout(request: CheckoutRequest):
+    if request.conversation_id not in conversations:
+        raise HTTPException(status_code=404, detail="Session not found")
+    cart = conversations[request.conversation_id]["cart"]
+    if not cart:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+
+    whatsapp_url = build_whatsapp_url(cart, request.name, request.phone, request.address)
+    summary_lines = [f"{e['qty']}x {e['name']} — Rs. {e['qty'] * e['unit_price']:,}" for e in cart]
+    summary = "\n".join(summary_lines) + f"\nTotal: Rs. {cart_total(cart):,}"
+    return CheckoutResponse(whatsapp_url=whatsapp_url, order_summary=summary)
 
 
 @app.get("/health")
