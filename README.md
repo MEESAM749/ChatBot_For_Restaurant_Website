@@ -18,10 +18,13 @@ A customer visits a restaurant's website, clicks the chat bubble, and asks:
 > *"Do you guys deliver to G-9?"*
 > *"What's your cheapest biryani?"*
 > *"Are you halal?"*
+> *"How much does it cost?"* (follow-up — the bot remembers context)
 
 The chatbot retrieves relevant information from the restaurant's own documents (menu, policies, FAQ) and generates a natural, accurate answer — no hallucination, no made-up facts.
 
 If the answer isn't in the knowledge base, it gracefully says so and redirects to WhatsApp.
+
+Customers can also **build an order** directly in the chat and **checkout via WhatsApp** — no payment integration needed.
 
 ---
 
@@ -40,13 +43,21 @@ Documents → Chunking → Embedding → Vector Database
 
 ### Runtime (every customer message)
 ```
-Question → Embed → Search → Build Prompt → LLM → Answer
+Question → Embed → Search → Build Prompt (+ history) → LLM → Answer
 ```
 1. **Embed** the customer's question into a vector
 2. **Search** ChromaDB for the 3 most similar chunks
-3. **Build** a prompt with the retrieved context + system instructions
+3. **Build** a prompt with the retrieved context + conversation history + system instructions
 4. **Generate** an answer using Llama 3.3 70B via Groq
 5. **Return** the answer through the REST API
+
+### Multi-Turn Memory
+
+Each conversation is tracked server-side with a session ID. The last 10 messages are sent to the LLM as context, so the bot can handle follow-ups like *"How much does it cost?"* after asking about biryani. Sessions auto-expire after 30 minutes of inactivity.
+
+### WhatsApp Ordering
+
+When the bot lists menu items, clickable **"+ Add"** buttons appear next to each item. Customers build a cart, then checkout — the system generates a pre-filled WhatsApp message with their order, name, phone, and delivery address, and opens it in a new tab.
 
 ---
 
@@ -128,25 +139,37 @@ Or open `chat_widget.html` in your browser and chat directly.
 
 ### `POST /chat`
 
-Send a customer message, get an AI-generated answer.
+Send a customer message, get an AI-generated answer. Supports multi-turn conversations via `conversation_id`.
 
 **Request:**
 ```json
 {
-  "message": "What time do you close on Friday?"
+  "message": "What time do you close on Friday?",
+  "conversation_id": null
 }
 ```
 
 **Response:**
 ```json
 {
-  "answer": "We're open until 1:00 AM on Fridays! If you'd like to order delivery, our delivery service runs until 11:30 PM.",
+  "answer": "We're open until 1:00 AM on Fridays! ...",
   "sources": [
-    {"source": "about.txt", "section": "HOURS", "chunk_id": "about_002"},
-    {"source": "policies.txt", "section": "DELIVERY", "chunk_id": "policies_025"}
-  ]
+    {"source": "about.txt", "section": "HOURS", "chunk_id": "about_002"}
+  ],
+  "conversation_id": "a1b2c3d4-..."
 }
 ```
+
+Send the returned `conversation_id` in subsequent requests to maintain context.
+
+### Cart Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/cart/add` | POST | Add an item to cart — `{ conversation_id, item, quantity }` |
+| `/cart/remove` | POST | Remove an item — `{ conversation_id, item }` |
+| `/cart/{conversation_id}` | GET | Get current cart contents and total |
+| `/cart/checkout` | POST | Generate WhatsApp order link — `{ conversation_id, name, phone, address }` |
 
 ### `GET /health`
 
@@ -176,6 +199,10 @@ The chat widget is a self-contained HTML/CSS/JS component. To embed it on any we
 
 Features:
 - Floating chat bubble with open/close animation
+- Multi-turn conversation memory (follow-up questions work)
+- **"+ Add" buttons** on menu items in bot responses for quick ordering
+- **Cart panel** with item management (view, remove, totals)
+- **WhatsApp checkout** — generates a pre-filled order message
 - Typing indicator while waiting for response
 - Mobile responsive
 - Graceful error handling (falls back to WhatsApp contact)
@@ -218,16 +245,16 @@ The entire pipeline (chunking, embedding, retrieval, generation) works automatic
 ## Limitations & Future Improvements
 
 **Current limitations:**
-- Single-turn only (no conversation memory across messages)
+- In-memory session storage (resets on server restart — fine for single-instance deployments)
 - Small embedding model occasionally retrieves imperfect chunks
 - No admin dashboard for document management
 
 **Planned improvements:**
-- Conversation memory for multi-turn chat
 - Admin dashboard for uploading/managing documents
 - Reranker for better retrieval accuracy
 - Support for PDF and DOCX document ingestion
 - Streaming responses for better UX
+- Persistent session storage (Redis) for multi-instance deployments
 
 ---
 
