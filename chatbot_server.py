@@ -10,6 +10,8 @@ TO RUN:
 """
 
 import os
+import uuid
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -27,6 +29,8 @@ COLLECTION_NAME = "karachi_bites"
 KB_FOLDER = "knowledge_base"
 TOP_K = 3
 GROQ_MODEL = "llama-3.3-70b-versatile"
+MAX_HISTORY_TURNS = 10          # keep last 10 messages (5 user + 5 assistant)
+SESSION_TTL_SECONDS = 30 * 60   # 30 minutes
 
 SYSTEM_PROMPT = """You are the friendly customer support assistant for Karachi Bites, 
 a Pakistani restaurant in F-7 Markaz, Islamabad.
@@ -41,8 +45,10 @@ RULES:
 - If someone asks about something not related to the restaurant, 
   politely redirect them.
 - When mentioning prices, always include "Rs." before the amount.
-- If a question could be answered by multiple chunks, synthesize the 
+- If a question could be answered by multiple chunks, synthesize the
   information into one coherent answer.
+- You may receive conversation history. Use it to understand follow-up
+  questions and resolve references like "it", "that", "how much", etc.
 """
 
 
@@ -165,6 +171,33 @@ print("Server ready!\n")
 
 
 # ============================================================
+# CONVERSATION MEMORY
+# ============================================================
+
+# { session_id: { "messages": [...], "last_active": timestamp } }
+conversations: dict[str, dict] = {}
+
+
+def get_or_create_session(conversation_id: str | None) -> str:
+    """Return an existing session ID or create a new one."""
+    if conversation_id and conversation_id in conversations:
+        conversations[conversation_id]["last_active"] = time.time()
+        return conversation_id
+    new_id = str(uuid.uuid4())
+    conversations[new_id] = {"messages": [], "last_active": time.time()}
+    return new_id
+
+
+def cleanup_expired_sessions():
+    """Remove sessions that have been inactive longer than SESSION_TTL_SECONDS."""
+    now = time.time()
+    expired = [sid for sid, s in conversations.items()
+               if now - s["last_active"] > SESSION_TTL_SECONDS]
+    for sid in expired:
+        del conversations[sid]
+
+
+# ============================================================
 # MODELS
 # ============================================================
 
@@ -175,6 +208,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: list[dict]
+    conversation_id: str
 
 
 # ============================================================
@@ -214,13 +248,13 @@ Customer question: {user_message}
 Answer the customer's question based on the context above."""
 
 
-def call_llm(system_prompt: str, user_prompt: str) -> str:
+def call_llm(system_prompt: str, history: list[dict], user_prompt: str) -> str:
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(history)
+    messages.append({"role": "user", "content": user_prompt})
     response = groq_client.chat.completions.create(
         model=GROQ_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
+        messages=messages,
         max_tokens=500,
         temperature=0.3,
     )
@@ -235,16 +269,30 @@ def call_llm(system_prompt: str, user_prompt: str) -> str:
 async def chat(request: ChatRequest):
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
-    
+
+    # Housekeeping: prune stale sessions
+    cleanup_expired_sessions()
+
+    # Get or create conversation session
+    session_id = get_or_create_session(request.conversation_id)
+    history = conversations[session_id]["messages"]
+
+    # RAG retrieval (always based on current message)
     context_chunks = retrieve_context(request.message)
     user_prompt = build_prompt(request.message, context_chunks)
-    answer = call_llm(SYSTEM_PROMPT, user_prompt)
-    
+
+    # Send history + new message to LLM
+    answer = call_llm(SYSTEM_PROMPT, history[-MAX_HISTORY_TURNS:], user_prompt)
+
+    # Save this turn to session history
+    history.append({"role": "user", "content": request.message})
+    history.append({"role": "assistant", "content": answer})
+
     sources = [
         {"source": c["source"], "section": c["section"], "chunk_id": c["chunk_id"]}
         for c in context_chunks
     ]
-    return ChatResponse(answer=answer, sources=sources)
+    return ChatResponse(answer=answer, sources=sources, conversation_id=session_id)
 
 
 @app.get("/health")

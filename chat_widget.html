@@ -554,6 +554,7 @@
 
         let chatOpen = false;
         let isWaiting = false;
+        let conversationId = null;
 
         function toggleChat() {
             chatOpen = !chatOpen;
@@ -616,12 +617,13 @@
                 const response = await fetch(`${API_URL}/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message })
+                    body: JSON.stringify({ message: message, conversation_id: conversationId })
                 });
 
                 if (!response.ok) throw new Error('Server error');
 
                 const data = await response.json();
+                conversationId = data.conversation_id;
                 hideTyping();
                 addMessage(data.answer, 'bot');
 
