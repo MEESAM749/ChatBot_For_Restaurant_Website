@@ -2,7 +2,7 @@
 
 A production-ready **RAG (Retrieval-Augmented Generation) chatbot** that answers customer questions using a restaurant's own knowledge base. Built with FastAPI, ChromaDB, and Groq (Llama 3.3 70B).
 
-**[Live Demo →](https://web-production-36259.up.railway.app/)**
+**[Live Demo →](karachibites.up.railway.app/)**
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green)
